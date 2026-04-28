@@ -31,6 +31,7 @@ import argparse
 import random
 import datetime as dt
 import csv
+from datetime import datetime
 
 # Initialize a global session for connection pooling
 session = requests.Session()

@@ -1,0 +1,19 @@
+==================================================
+ SESSION STATISTICS
+==================================================
+ Time elapsed:    23:48:17
+ Avg time/game:   3.24s
+ New games:       106549 (+1219.10% growth)
+ Not released:    39794
+ Discarded:       196
+--------------------------------------------------
+ TOTAL DATABASE STATS
+--------------------------------------------------
+ Total games:     115289
+ Total discarded: 208
+ Total pending:   42975
+==================================================
+
+10.03.2026 / Tuesday [i 14:40:33] Steam Games Scraper 1.3.0 by Martin Bustos <fronkongames@gmail.com>
+14.03.2026 / Saturday [i 14:28:57] Done
+Total 4 days
