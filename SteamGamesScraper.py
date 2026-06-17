@@ -33,6 +33,12 @@ import datetime as dt
 import csv
 from datetime import datetime
 
+from numpy.distutils.fcompiler import none
+
+from LaunchMetrics import GetLaunchMetrics
+
+from SteamChartsScraper import scrape_steam_charts_launch_metrics
+
 # Initialize a global session for connection pooling
 session = requests.Session()
 
@@ -202,17 +208,27 @@ def ParseSteamGame(app):
   game['release_date'] = app['release_date']['date'] if 'release_date' in app and not app['release_date']['coming_soon'] else ''
   game['required_age'] = int(str(app['required_age']).replace('+', '')) if 'required_age' in app else 0
 
+  if game['required_age'] == 0:
+    if "ratings" in app and "pegi" in app["ratings"]:
+      game['PEGI_rating'] = int(app['ratings']['pegi']['rating']) if 'ratings' in app else 0
+
   if app['is_free'] or 'price_overview' not in app:
     game['price'] = 0.0
   else:
-    game['price'] = PriceToFloat(app['price_overview']['final_formatted'])
+    if app['price_overview']['initial_formatted'] == '':
+      game['price'] = PriceToFloat(app['price_overview']['final_formatted'])
+    else:
+      game['price'] = PriceToFloat(app['price_overview']['initial_formatted'])
+    #TODO this line gives current price of the game with 'final_formatted',
+    # if you want to initial publish price get 'initial_formatted'
 
-  game['dlc_count'] = len(app['dlc']) if 'dlc' in app else 0
+  #game['dlc_count'] = len(app['dlc']) if 'dlc' in app else 0
   game['detailed_description'] = app['detailed_description'].strip() if 'detailed_description' in app else ''
   game['about_the_game'] = app['about_the_game'].strip() if 'about_the_game' in app else ''
   game['short_description'] = app['short_description'].strip() if 'short_description' in app else ''
-  game['reviews'] = app['reviews'].strip() if 'reviews' in app else ''
+  #game['reviews'] = app['reviews'].strip() if 'reviews' in app else ''
   game['header_image'] = app['header_image'].strip() if 'header_image' in app and app['header_image'] else ''
+  game['capsule_image'] = app['capsule_image'].strip() if 'capsule_image' in app and app['capsule_image'] else ''
   game['website'] = app['website'].strip() if 'website' in app and app['website'] is not None else ''
   game['support_url'] = app['support_info']['url'].strip() if 'support_info' in app else ''
   game['support_email'] = app['support_info']['email'].strip() if 'support_info' in app else ''
@@ -222,8 +238,8 @@ def ParseSteamGame(app):
   game['metacritic_score'] = int(app['metacritic']['score']) if 'metacritic' in app else 0
   game['metacritic_url'] = app['metacritic']['url'] if 'metacritic' in app else ''
   game['achievements'] = int(app['achievements']['total']) if 'achievements' in app else 0
-  game['recommendations'] = app['recommendations']['total'] if 'recommendations' in app else 0
-  game['notes'] = app['content_descriptors']['notes'] if 'content_descriptors' in app and app['content_descriptors']['notes'] is not None else ''
+  ##game['recommendations'] = app['recommendations']['total'] if 'recommendations' in app else 0
+  #game['notes'] = app['content_descriptors']['notes'] if 'content_descriptors' in app and app['content_descriptors']['notes'] is not None else ''
 
   game['supported_languages'] = []
   game['full_audio_languages'] = []
@@ -276,17 +292,17 @@ def ParseSteamGame(app):
     for screenshot in app['screenshots']:
       game['screenshots'].append(screenshot['path_full'])
 
-  game['movies'] = []
-  if 'movies' in app:
-    for movie in app['movies']:
-      if 'mp4' in movie:
-        game['movies'].append(movie['mp4']['max'])
+  game['movie_count'] = []
+  if 'movies' in app and isinstance(app['movies'], list):
+    game['movie_count'] = len(app['movies'])
+  else:
+    game['movie_count'] = 0
 
   game['detailed_description'] = SanitizeText(game['detailed_description'])
   game['about_the_game'] = SanitizeText(game['about_the_game'])
   game['short_description'] = SanitizeText(game['short_description'])
-  game['reviews'] = SanitizeText(game['reviews'])
-  game['notes'] = SanitizeText(game['notes'])
+  #game['reviews'] = SanitizeText(game['reviews'])
+  #game['notes'] = SanitizeText(game['notes']) we dont need this column
 
   return game
 
@@ -403,31 +419,41 @@ def Scraper(dataset, notreleased, discarded, args, steam_api_key, appIDs = None)
               if args.steamspy:
                 extra = SteamSpyRequest(appID, min(4, args.sleep), successRequestCount, errorRequestCount, args.retries)
                 if extra != None:
-                  game['user_score'] = extra['userscore']
-                  game['score_rank'] = extra['score_rank']
-                  game['positive'] = extra['positive']
-                  game['negative'] = extra['negative']
+                  #game['user_score'] = extra['userscore']
+                  #game['score_rank'] = extra['score_rank']
+                  #game['positive'] = extra['positive']
+                  #game['negative'] = extra['negative']
                   game['estimated_owners'] = extra['owners'].replace(',', '').replace('..', '-')
-                  game['average_playtime_forever'] = extra['average_forever']
-                  game['average_playtime_2weeks'] = extra['average_2weeks']
-                  game['median_playtime_forever'] = extra['median_forever']
-                  game['median_playtime_2weeks'] = extra['median_2weeks']
-                  game['discount'] = extra['discount']
-                  game['peak_ccu'] = extra['ccu']
+                  #game['average_playtime_forever'] = extra['average_forever']
+                  #game['average_playtime_2weeks'] = extra['average_2weeks']
+                  #game['median_playtime_forever'] = extra['median_forever']
+                  #game['median_playtime_2weeks'] = extra['median_2weeks']
+                  #game['discount'] = extra['discount']
+                  #game['peak_ccu'] = extra['ccu']
                   game['tags'] = extra['tags']
                 else:
-                  game['user_score'] = 0
-                  game['score_rank'] = ""
-                  game['positive'] = 0
-                  game['negative'] = 0
+                  #game['user_score'] = 0
+                  #game['score_rank'] = ""
+                  #game['positive'] = 0
+                  #game['negative'] = 0
                   game['estimated_owners'] = "0 - 0"
-                  game['average_playtime_forever'] = 0
-                  game['average_playtime_2weeks'] = 0
-                  game['median_playtime_forever'] = 0
-                  game['median_playtime_2weeks'] = 0
-                  game['discount'] = 0
-                  game['peak_ccu'] = 0
+                  #game['average_playtime_forever'] = 0
+                  #game['average_playtime_2weeks'] = 0
+                  #game['median_playtime_forever'] = 0
+                  #game['median_playtime_2weeks'] = 0
+                  #game['discount'] = 0
+                  #game['peak_ccu'] = 0
                   game['tags'] = []
+
+              launch_positive, launch_negative, launch_total = GetLaunchMetrics(appID)
+              game['Launch_Positive_Reviews'] = int(launch_positive.iloc[0])
+              game['Launch_Negative_Reviews'] = int(launch_negative.iloc[0])
+              game['Total_Launch_Reviews'] = int(launch_total.iloc[0])
+
+              launch_avg_players, launch_peak_player = scrape_steam_charts_launch_metrics(appID)
+
+              game['Launch_avg_players'] = launch_avg_players
+              game['Launch_peak_player'] = launch_peak_player
 
               dataset[appID] = game
               gamesAdded += 1

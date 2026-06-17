@@ -1,0 +1,1 @@
+730 2026-05-17 12:22:11 Error - steam charts: HTTPSConnectionPool(host='steamcharts.com', port=443): Max retries exceeded with url: /app/730 (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 502 Bad Gateway')))
