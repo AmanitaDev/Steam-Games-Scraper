@@ -209,8 +209,11 @@ def ParseSteamGame(app):
   game['required_age'] = int(str(app['required_age']).replace('+', '')) if 'required_age' in app else 0
 
   if game['required_age'] == 0:
-    if "ratings" in app and "pegi" in app["ratings"]:
-      game['PEGI_rating'] = int(app['ratings']['pegi']['rating']) if 'ratings' in app else 0
+      if "ratings" in app and app["ratings"] is not None and "pegi" in app["ratings"] and app["ratings"][
+          "pegi"] is not None:
+          game['PEGI_rating'] = int(app['ratings']['pegi'].get('rating', 0))
+      else:
+          game['PEGI_rating'] = 0
 
   if app['is_free'] or 'price_overview' not in app:
     game['price'] = 0.0
@@ -445,15 +448,28 @@ def Scraper(dataset, notreleased, discarded, args, steam_api_key, appIDs = None)
                   #game['peak_ccu'] = 0
                   game['tags'] = []
 
-              launch_positive, launch_negative, launch_total = GetLaunchMetrics(appID)
-              game['Launch_Positive_Reviews'] = int(launch_positive.iloc[0])
-              game['Launch_Negative_Reviews'] = int(launch_negative.iloc[0])
-              game['Total_Launch_Reviews'] = int(launch_total.iloc[0])
+              metrics_result = GetLaunchMetrics(appID)
 
-              launch_avg_players, launch_peak_player = scrape_steam_charts_launch_metrics(appID)
+              if metrics_result is not None:
+                launch_positive, launch_negative, launch_total = metrics_result
+                game['Launch_Positive_Reviews'] = int(launch_positive.iloc[0])
+                game['Launch_Negative_Reviews'] = int(launch_negative.iloc[0])
+                game['Total_Launch_Reviews'] = int(launch_total.iloc[0])
+              else:
+                Log(WARNING, f"No review histogram data available for AppID {appID}. Using fallbacks.")
+                game['Launch_Positive_Reviews'] = 0
+                game['Launch_Negative_Reviews'] = 0
+                game['Total_Launch_Reviews'] = 0
 
-              game['Launch_avg_players'] = launch_avg_players
-              game['Launch_peak_player'] = launch_peak_player
+              try:
+                launch_avg_players, launch_peak_player = scrape_steam_charts_launch_metrics(appID)
+                game['Launch_Avg_Players'] = launch_avg_players
+                game['Launch_Peak_Players'] = launch_peak_player
+              except RuntimeError as e:
+                Log(WARNING, f"Skipping SteamCharts for AppID {appID}: {e}")
+                # Provide safe fallback values so your database formatting stays uniform
+                game['Launch_Avg_Players'] = 0.0
+                game['Launch_Peak_Players'] = 0.0
 
               dataset[appID] = game
               gamesAdded += 1

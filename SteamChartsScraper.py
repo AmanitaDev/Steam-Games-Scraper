@@ -10,7 +10,7 @@ def connection_check(wait=False):
     return True
 
 
-def scrape_steam_charts_launch_metrics(app_id="730", attempts=3, timeout=5, log_path="scraper_log.txt"):
+def scrape_steam_charts_launch_metrics(app_id="730", attempts=3, timeout=1, log_path="scraper_log.txt"):
     """
     Scrapes a specific AppID from steamcharts.com, extracts the player history table,
     and returns the calculated average and peak player metrics for the launch window (last 3 rows).

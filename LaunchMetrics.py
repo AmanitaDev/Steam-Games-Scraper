@@ -65,11 +65,11 @@ def get_full_review_histogram_df(app_id):
 
 
 def GetLaunchMetrics(target_appid):
-    print(f"Downloading full historical review timeline for AppID {target_appid}...")
+    #print(f"Downloading full historical review timeline for AppID {target_appid}...")
     full_chart_df = get_full_review_histogram_df(target_appid)
 
     if full_chart_df is not None:
-        print(f"\nSuccessfully built a {full_chart_df.shape[0]}-month history map.")
+        #print(f"\nSuccessfully built a {full_chart_df.shape[0]}-month history map.")
         # Slices the dataframe to keep up to index 3
         full_chart_df = full_chart_df.iloc[:3]
         # display(full_chart_df)

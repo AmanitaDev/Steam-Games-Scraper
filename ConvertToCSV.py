@@ -1,171 +1,139 @@
-########################################################################################################################
-# Copyright (c) Martin Bustos @FronkonGames <fronkongames@gmail.com>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-# documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
-# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-# the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-# WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-########################################################################################################################
-__author__ = "Martin Bustos <fronkongames@gmail.com>"
-__copyright__ = "Copyright 2022, Martin Bustos"
-__license__ = "MIT"
-__version__ = "1.1.0"
-__email__ = "fronkongames@gmail.com"
-
 import sys
 import os
 import json
 import argparse
+import csv
+
 
 def ProgressBar(count, total):
-  bar_len = 50
-  filled_len = int(round(bar_len * count / float(total)))
+    """Displays a simple progress bar in the console."""
+    bar_len = 50
+    filled_len = int(round(bar_len * count / float(total)))
+    percents = round(100.0 * count / float(total), 1)
+    bar = '█' * filled_len + '░' * (bar_len - filled_len)
+    sys.stdout.write(f'\r{bar} {percents}%')
+    sys.stdout.flush()
 
-  percents = round(100.0 * count / float(total), 1)
-  bar = '█' * filled_len + '░' * (bar_len - filled_len)
 
-  sys.stdout.write(f'{bar} {percents}%\r')
-  sys.stdout.flush()
+def get_string(app, key, default=''):
+    """Safely extracts strings and strips newlines."""
+    if key in app and app[key] not in (None, ''):
+        return str(app[key]).replace('\n', ' ').replace('\r', ' ').strip()
+    return default
 
-def WriteString(app, key, default = ''):
-  value = default
-  if key in app and app[key] != None and app[key] != '':
-    value = str(app[key]).replace('"', '').replace('\n', ' ').replace('\r', ' ').strip()
-  return f'"{value}"'
 
-def WriteStringArray(app, key):
-  values = []
-  for value in app[key]:
-    if value != None:
-      values.append(value.replace('"', '').replace('\n', ' ').replace('\r', ' ').strip())
+def get_string_array(app, key):
+    """Safely extracts arrays and joins them into a single comma-separated string."""
+    if key in app and isinstance(app[key], list):
+        values = [str(v).replace('\n', ' ').replace('\r', ' ').strip() for v in app[key] if v is not None]
+        return ','.join(values)
+    return ""
 
-  text = ','.join(values)
-  return f'"{text}"'
 
-def WriteKey(app, key, default = '0'):
-  return str(app[key]) if key in app else default
+def get_key(app, key, default='0'):
+    """Safely extracts numeric or boolean keys."""
+    return str(app[key]) if key in app and app[key] is not None else default
 
-print(f'Convert JSON to CSV {__version__} by {__author__}.')
-parser = argparse.ArgumentParser(description='Convert JSON to CSV.')
-parser.add_argument('-f', '--file', type=str, default='games.json', help='Dataset file name')
-args = parser.parse_args()
 
-dataset = {}
+def get_tags(app):
+    """Extracts just the tag names from the tags dictionary, ignoring the weights."""
+    if 'tags' in app and isinstance(app['tags'], dict):
+        return ','.join(app['tags'].keys())
+    return ""
 
-filename = args.file
-if os.path.exists(filename):
-  print('Loading dataset.')
-  with open(filename, 'r', encoding='utf-8') as fin:
-    text = fin.read()
-    if len(text) > 0:
-      dataset = json.loads(text)
 
-  print(f'Dataset with {len(dataset)} games loaded.')
+def get_packages(app):
+    """Extracts only the titles from the nested packages list."""
+    if 'packages' in app and isinstance(app['packages'], list):
+        titles = []
+        for pkg in app['packages']:
+            if isinstance(pkg, dict) and 'title' in pkg:
+                titles.append(str(pkg['title']).replace('\n', ' ').strip())
+        return ','.join(titles)
+    return ""
 
-  with open('games.csv', 'w', encoding="utf-8") as fin:
+
+def main():
+    print('Convert JSON to CSV.')
+    parser = argparse.ArgumentParser(description='Convert JSON to CSV.')
+    parser.add_argument('-f', '--file', type=str, default='games.json', help='Dataset file name')
+    args = parser.parse_args()
+
+    filename = args.file
+    if not os.path.exists(filename):
+        print(f'Dataset file \'{filename}\' not found.')
+        sys.exit()
+
+    print('Loading dataset...')
+    with open(filename, 'r', encoding='utf-8') as fin:
+        dataset = json.load(fin)
+
+    print(f'Dataset with {len(dataset)} games loaded. Starting conversion...')
+
     header = [
-      'AppID',
-      'Name',
-      'Release date',
-      'Estimated owners',
-      'Peak CCU',
-      'Required age',
-      'Price',
-      'Discount',
-      'DLC count',
-      'About the game',
-      'Supported languages',
-      'Full audio languages',
-      'Reviews',
-      'Header image',
-      'Website',
-      'Support url',
-      'Support email',
-      'Windows',
-      'Mac',
-      'Linux',
-      'Metacritic score',
-      'Metacritic url',
-      'User score',
-      'Positive',
-      'Negative',
-      'Score rank',
-      'Achievements',
-      'Recommendations',
-      'Notes',
-      'Average playtime forever',
-      'Average playtime two weeks',
-      'Median playtime forever',
-      'Median playtime two weeks',
-      'Developers',
-      'Publishers',
-      'Categories',
-      'Genres',
-      'Tags',
-      'Screenshots',
-      'Movies'
+        'AppID', 'Name', 'Release date', 'Required age', 'Price',
+        'Detailed description', 'About the game', 'Short description',
+        'Header image', 'Capsule image', 'Website', 'Support url',
+        'Support email', 'Windows', 'Mac', 'Linux', 'Metacritic score',
+        'Metacritic url', 'Achievements', 'Supported languages',
+        'Full audio languages', 'Packages', 'Developers', 'Publishers',
+        'Categories', 'Genres', 'Screenshots', 'Movie count',
+        'Estimated owners', 'Tags', 'Launch positive reviews',
+        'Launch negative reviews', 'Total launch reviews',
+        'Launch average players', 'Launch peak players'
     ]
 
-    fin.write(','.join(header) + '\n')
+    with open('games.csv', 'w', encoding="utf-8", newline='') as fout:
+        # csv.QUOTE_MINIMAL ensures that any fields containing commas (like our joined arrays)
+        # are wrapped in quotes so they don't break the column structure.
+        writer = csv.writer(fout, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(header)
 
-    count = 0
-    total = len(dataset)
-    for appID in dataset:
-      app = dataset[appID]
+        total = len(dataset)
+        for count, (appID, app) in enumerate(dataset.items(), 1):
+            row = [
+                appID,
+                get_string(app, 'name'),
+                get_string(app, 'release_date'),
+                get_key(app, 'required_age'),
+                get_key(app, 'price', '0.0'),
+                get_string(app, 'detailed_description'),
+                get_string(app, 'about_the_game'),
+                get_string(app, 'short_description'),
+                get_string(app, 'header_image'),
+                get_string(app, 'capsule_image'),
+                get_string(app, 'website'),
+                get_string(app, 'support_url'),
+                get_string(app, 'support_email'),
+                get_key(app, 'windows', 'False'),
+                get_key(app, 'mac', 'False'),
+                get_key(app, 'linux', 'False'),
+                get_key(app, 'metacritic_score'),
+                get_string(app, 'metacritic_url'),
+                get_key(app, 'achievements'),
+                get_string_array(app, 'supported_languages'),
+                get_string_array(app, 'full_audio_languages'),
+                get_packages(app),
+                get_string_array(app, 'developers'),
+                get_string_array(app, 'publishers'),
+                get_string_array(app, 'categories'),
+                get_string_array(app, 'genres'),
+                get_string_array(app, 'screenshots'),
+                get_key(app, 'movie_count'),
+                get_string(app, 'estimated_owners'),
+                get_tags(app),
+                get_key(app, 'Launch_Positive_Reviews'),
+                get_key(app, 'Launch_Negative_Reviews'),
+                get_key(app, 'Total_Launch_Reviews'),
+                get_key(app, 'Launch_Avg_Players'),
+                get_key(app, 'Launch_Peak_Players')
+            ]
 
-      data = f"{appID},"
-      data += f"{WriteString(app, 'name')},"
-      data += f"{WriteString(app, 'release_date')},"
-      data += f"{WriteString(app, 'estimated_owners')},"
-      data += f"{WriteKey(app, 'peak_ccu')},"
-      data += f"{WriteKey(app, 'required_age')},"
-      data += f"{WriteKey(app, 'price', '0.0')},"
-      data += f"{WriteKey(app, 'discount')},"
-      data += f"{WriteKey(app, 'dlc_count')},"
-      data += f"{WriteString(app, 'about_the_game')},"
-      data += f"{WriteString(app, 'supported_languages')},"
-      data += f"{WriteString(app, 'full_audio_languages')},"
-      data += f"{WriteString(app, 'reviews')},"
-      data += f"{WriteString(app, 'header_image')},"
-      data += f"{WriteString(app, 'website')},"
-      data += f"{WriteString(app, 'support_url')},"
-      data += f"{WriteString(app, 'support_email')},"
-      data += f"{WriteKey(app, 'windows', 'False')},"
-      data += f"{WriteKey(app, 'mac', 'False')},"
-      data += f"{WriteKey(app, 'linux', 'False')},"
-      data += f"{WriteKey(app, 'metacritic_score')},"
-      data += f"{WriteString(app, 'metacritic_url')},"
-      data += f"{WriteKey(app, 'user_score')},"
-      data += f"{WriteKey(app, 'positive')},"
-      data += f"{WriteKey(app, 'negative')},"
-      data += f"{WriteString(app, 'score_rank')},"
-      data += f"{WriteKey(app, 'achievements')},"
-      data += f"{WriteKey(app, 'recommendations')},"
-      data += f"{WriteString(app, 'notes')},"
-      data += f"{WriteKey(app, 'average_playtime_forever')},"
-      data += f"{WriteKey(app, 'average_playtime_2weeks')},"
-      data += f"{WriteKey(app, 'median_playtime_forever')},"
-      data += f"{WriteKey(app, 'median_playtime_2weeks')},"
-      data += f"{WriteStringArray(app, 'developers')},"
-      data += f"{WriteStringArray(app, 'publishers')},"
-      data += f"{WriteStringArray(app, 'categories')},"
-      data += f"{WriteStringArray(app, 'genres')},"
-      data += f"{WriteStringArray(app, 'tags')},"
-      data += f"{WriteStringArray(app, 'screenshots')},"
-      data += f"{WriteStringArray(app, 'movies')}"
-      data += "\n"
+            writer.writerow(row)
+            ProgressBar(count, total)
 
-      fin.write(data)
-      count += 1
-      ProgressBar(count, total)
-  
     print('\nDone.')
-else:
-  print(f'Dataset file \'{args.file}\' not found.')
+
+
+if __name__ == "__main__":
+    main()
